@@ -3,29 +3,47 @@ from pieces import Piece, Side, piece_from_str
 from board import Board
 from state import Status
 
+def _make_move(board: Board, origin, destination, c_place = None):
+    moving = board.get(*origin)
+    
+    c_place = destination if c_place is None else c_place
+    captured = board.get(*c_place)
+    board.remove(*c_place)
+
+    board.place(moving, *destination) 
+    board.remove(*origin)
+    
+    return moving, captured
+
+def _unmake_move(board: Board, moved, captured, origin, destination, c_place = None):
+    board.place(moved, *origin)
+    board.remove(*destination)
+    
+    c_place = destination if c_place is None else c_place
+    board.place(captured, *c_place)
+    
+
 def legal_moves(board: Board, status: Status):
     """Filtra os pseudo-legais, testando cada lance na posição resultante."""
     result = {}
     for origin, destinations in pseudo_legal_moves(board, status.side):
         ok = []
         for dest in destinations:
-            moving = board.get(*origin)
-            captured = board.get(*dest)
-
-            board.place(moving, *dest)      # make
-            board.place(None, *origin)
+            moving, captured = _make_move(board, origin, dest)
 
             if not is_in_check(board, status.side):
-                ok.append(dest)               
-            
-            board.place(moving, *origin)    # unmake
-            board.place(captured, *dest)
+                ok.append(dest)
+
+            _unmake_move(board, moving, captured, origin, dest)
 
         if ok:
             result[origin] = ok
         
     for origin, destinations in castle_moves(board, status):
         result.setdefault(origin, []).extend(destinations)
+    
+    for origin, destinations in get_en_passant(board, status):
+        result.setdefault(origin, []).extend(destinations)    
     
     return list(result.items())
    
@@ -188,36 +206,64 @@ def castle_moves(board: Board, status: Status):
     return result
         
 
-def get_en_passant(board: Board, status: Status):
+def _get_en_passant_target(board: Board, status: Status):
     if status.en_passant is None:
-        return []
+        return None
+
     current_row, current_col = coords(status.en_passant)
     if not (0 <= current_row < 8 and 0 <= current_col < 8):
-        return []
+        return None
+
     target_pawn = board.get(current_row, current_col)
-    target_side = Side.BLACK if status.side == Side.WHITE else Side.WHITE
     if target_pawn is None:
+        return None
+
+    expected_pawn = 'p' if status.side == Side.WHITE else 'P'
+    if target_pawn != expected_pawn:
+        return None
+
+    if (target_pawn == 'P' and current_row != 3) or (target_pawn == 'p' and current_row != 4):
+        return None
+
+    return current_row, current_col, target_pawn
+
+
+def _can_en_passant_capture(board: Board, current_row, current_col, next_col, target_pawn):
+    ally_pawn = board.get(current_row, next_col)
+    if ally_pawn is None or ally_pawn not in ('P', 'p'):
+        return False
+    if target_pawn == ally_pawn:
+        return False
+
+    target_col = current_col
+    target_row = current_row + 1 if ally_pawn == 'P' else current_row - 1
+    if board.get(target_row, target_col) is not None:
+        return False
+
+    pawn = piece_from_str(ally_pawn)
+    return _piece_attacks_square(board, pawn, current_row, next_col, target_row, target_col)
+
+
+def get_en_passant(board: Board, status: Status):
+    target = _get_en_passant_target(board, status)
+    if target is None:
         return []
-    if (target_side == Side.WHITE and target_pawn != 'P') or (target_side == Side.BLACK and target_pawn != 'p'):
-        return []
-    if (target_pawn == 'P' and current_row != 3) or (target_pawn == 'p' and current_row != 4):        
-        return []
-    
+
+    current_row, current_col, target_pawn = target
     result = []
-    for next_col in current_col - 1, current_col + 1:
+    for next_col in (current_col - 1, current_col + 1):
         if not (0 <= next_col < 8):
             continue
-        ally_pawn = board.get(current_row, next_col)
-        if ally_pawn is None:
+        if not _can_en_passant_capture(board, current_row, current_col, next_col, target_pawn):
             continue
-        if ally_pawn != 'P' and ally_pawn != 'p':
-            continue
-        if target_pawn == ally_pawn:
-            continue
+
+        target_row = current_row + 1 if board.get(current_row, next_col) == 'P' else current_row - 1
         target_col = current_col
-        target_row = current_row + 1 if ally_pawn == 'P' else current_row - 1
-        ally_pawn = piece_from_str(ally_pawn)
-        if _piece_attacks_square(board, ally_pawn, current_row, next_col, target_row, target_col):
-            result.append(([current_row, next_col], [(target_row, target_col)]))
-            
+        moving, captured = _make_move(board, (current_row, next_col), (target_row, target_col), (current_row, current_col))
+
+        if not is_in_check(board, status.side):
+            result.append(((current_row, next_col), [(target_row, target_col)]))
+
+        _unmake_move(board, moving, captured, (current_row, next_col), (target_row, target_col), (current_row, current_col))
+
     return result
