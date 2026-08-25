@@ -14,14 +14,14 @@ def square(row, col):
         raise ValueError("Posição inválida")
        
     match col:
-        case 0: return f"a{col + 1}"
-        case 1: return f"b{col + 1}"
-        case 2: return f"c{col + 1}"
-        case 3: return f"d{col + 1}"
-        case 4: return f"e{col + 1}"
-        case 5: return f"f{col + 1}"
-        case 6: return f"g{col + 1}"
-        case 7: return f"h{col + 1}"
+        case 0: return f"a{row + 1}"
+        case 1: return f"b{row + 1}"
+        case 2: return f"c{row + 1}"
+        case 3: return f"d{row + 1}"
+        case 4: return f"e{row + 1}"
+        case 5: return f"f{row + 1}"
+        case 6: return f"g{row + 1}"
+        case 7: return f"h{row + 1}"
         case _:
             raise ValueError('Posição inválida')
         
