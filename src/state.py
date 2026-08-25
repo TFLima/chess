@@ -1,6 +1,9 @@
+from dataclasses import dataclass
 from pieces import Side
 
+
+@dataclass
 class Status:
     side: Side = Side.WHITE
-    en_passant = None
-    castle = 'KQkq'    
+    castle: str = 'KQkq'    
+    en_passant: str | None = None

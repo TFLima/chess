@@ -17,6 +17,7 @@ class Piece(ABC):
         self.side = side
         ...
         
+    @abstractmethod
     def moves(self, row, col):
         """dr = delta row, dc = delta column"""
         ...

@@ -140,40 +140,84 @@ def is_in_check(board: Board, side: Side):
     return is_square_attacked(board, *pos, enemy)
 
 
+def _can_castle_side(board: Board, status: Status, castle_char: str, rook_file: str, empty_files, path_squares):
+    """Valida um lado específico do roque."""
+    if castle_char not in status.castle:
+        return False
+
+    row = '1' if status.side == Side.WHITE else '8'
+    rook = 'R' if status.side == Side.WHITE else 'r'
+    rook_square = coords(rook_file + row)
+    rook_piece = board.get(*rook_square)
+    if rook_piece != rook:
+        return False
+
+    if any(board.get(*coords(file + row)) is not None for file in empty_files):
+        return False
+
+    if any(is_square_attacked(board, *coords(square + row), Side.BLACK if status.side == Side.WHITE else Side.WHITE)
+           for square in path_squares):
+        return False
+
+    return True
+
+
 def castle_moves(board: Board, status: Status):
     """Verifica e valida todas as opções de roque"""
-    k_castle = 'K' if status.side == Side.WHITE else 'k'
-    q_castle = 'Q' if status.side == Side.WHITE else 'q'
-    rook = 'R' if status.side == Side.WHITE else 'r'
+    side_char = 'K' if status.side == Side.WHITE else 'k'
     row = '1' if status.side == Side.WHITE else '8'
-    
-    if not (k_castle in status.castle or q_castle in status.castle):
+    king_square = coords('e' + row)
+    king = board.get(*king_square)
+
+    if king != side_char:
         return []
-    king = board.get(*coords('e'+row))        
-    k_rook = board.get(*coords('h'+row)) if k_castle in status.castle else None
-    q_rook = board.get(*coords('a'+row)) if q_castle in status.castle else None
+
+    if is_square_attacked(board, *king_square, Side.BLACK if status.side == Side.WHITE else Side.WHITE):
+        return []
+
+    if not any(castle in status.castle for castle in (('K', 'Q') if status.side == Side.WHITE else ('k', 'q'))):
+        return []
+
+    result = []
+    if _can_castle_side(board, status, 'K' if status.side == Side.WHITE else 'k', 'h', ('f', 'g'), ('f', 'g')):
+        result.append((king_square, [coords('g' + row)]))
+
+    if _can_castle_side(board, status, 'Q' if status.side == Side.WHITE else 'q', 'a', ('d', 'c', 'b'), ('d', 'c')):
+        result.append((king_square, [coords('c' + row)]))
+
+    return result
         
-    if king is None:
+
+def get_en_passant(board: Board, status: Status):
+    if status.en_passant is None:
         return []
-    if k_rook is None and q_rook is None:
+    current_row, current_col = coords(status.en_passant)
+    if not (0 <= current_row < 8 and 0 <= current_col < 8):
         return []
-    
-    enemy = Side.BLACK if status.side == Side.WHITE else Side.WHITE
-    if king != k_castle or is_square_attacked(board, *coords('e'+row), enemy):
+    target_pawn = board.get(current_row, current_col)
+    target_side = Side.BLACK if status.side == Side.WHITE else Side.WHITE
+    if target_pawn is None:
+        return []
+    if (target_side == Side.WHITE and target_pawn != 'P') or (target_side == Side.BLACK and target_pawn != 'p'):
+        return []
+    if (target_pawn == 'P' and current_row != 3) or (target_pawn == 'p' and current_row != 4):        
         return []
     
     result = []
-    if k_rook == rook:
-        if board.get(*coords('f'+row)) is None and board.get(*coords('g'+row)) is None:            
-            if not(is_square_attacked(board, *coords('f'+row), enemy) or is_square_attacked(board, *coords('g'+row), enemy)):
-                result.append((coords('e'+row), [coords('g'+row)]))
-    if q_rook == rook:
-        if board.get(*coords('d'+row)) is None and board.get(*coords('c'+row)) is None and board.get(*coords('b'+row)) is None:
-            if not(is_square_attacked(board, *coords('d'+row), enemy) or is_square_attacked(board, *coords('c'+row), enemy)):
-                result.append((coords('e'+row), [coords('c'+row)]))
+    for next_col in current_col - 1, current_col + 1:
+        if not (0 <= next_col < 8):
+            continue
+        ally_pawn = board.get(current_row, next_col)
+        if ally_pawn is None:
+            continue
+        if ally_pawn != 'P' and ally_pawn != 'p':
+            continue
+        if target_pawn == ally_pawn:
+            continue
+        target_col = current_col
+        target_row = current_row + 1 if ally_pawn == 'P' else current_row - 1
+        ally_pawn = piece_from_str(ally_pawn)
+        if _piece_attacks_square(board, ally_pawn, current_row, next_col, target_row, target_col):
+            result.append(([current_row, next_col], [(target_row, target_col)]))
             
     return result
-        
-    
-    
-        
