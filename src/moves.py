@@ -3,7 +3,7 @@ from pieces import Piece, Side, piece_from_str
 from board import Board
 from state import Status
 
-def _make_move(board: Board, origin, destination, c_place = None):
+def make_move(board: Board, origin, destination, c_place = None):
     moving = board.get(*origin)
     
     c_place = destination if c_place is None else c_place
@@ -15,7 +15,7 @@ def _make_move(board: Board, origin, destination, c_place = None):
     
     return moving, captured
 
-def _unmake_move(board: Board, moved, captured, origin, destination, c_place = None):
+def unmake_move(board: Board, moved, captured, origin, destination, c_place = None):
     board.place(moved, *origin)
     board.remove(*destination)
     
@@ -24,17 +24,19 @@ def _unmake_move(board: Board, moved, captured, origin, destination, c_place = N
     
 
 def legal_moves(board: Board, status: Status):
-    """Filtra os pseudo-legais, testando cada lance na posição resultante."""
+    """Filtra os pseudo-legais, testando cada lance na posição resultante.
+
+    Retorna {origem: [destinos]}."""
     result = {}
     for origin, destinations in pseudo_legal_moves(board, status.side):
         ok = []
         for dest in destinations:
-            moving, captured = _make_move(board, origin, dest)
+            moving, captured = make_move(board, origin, dest)
 
             if not is_in_check(board, status.side):
                 ok.append(dest)
 
-            _unmake_move(board, moving, captured, origin, dest)
+            unmake_move(board, moving, captured, origin, dest)
 
         if ok:
             result[origin] = ok
@@ -45,7 +47,7 @@ def legal_moves(board: Board, status: Status):
     for origin, destinations in get_en_passant(board, status):
         result.setdefault(origin, []).extend(destinations)    
     
-    return list(result.items())
+    return result
    
 
 def pseudo_legal_moves(board: Board, side: Side):
@@ -259,11 +261,11 @@ def get_en_passant(board: Board, status: Status):
 
         target_row = current_row + 1 if board.get(current_row, next_col) == 'P' else current_row - 1
         target_col = current_col
-        moving, captured = _make_move(board, (current_row, next_col), (target_row, target_col), (current_row, current_col))
+        moving, captured = make_move(board, (current_row, next_col), (target_row, target_col), (current_row, current_col))
 
         if not is_in_check(board, status.side):
             result.append(((current_row, next_col), [(target_row, target_col)]))
 
-        _unmake_move(board, moving, captured, (current_row, next_col), (target_row, target_col), (current_row, current_col))
+        unmake_move(board, moving, captured, (current_row, next_col), (target_row, target_col), (current_row, current_col))
 
     return result
