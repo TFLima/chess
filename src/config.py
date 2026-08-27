@@ -1,0 +1,1 @@
+AUTO_PROMO: bool = False #determina promoção automática para Dama (Q)

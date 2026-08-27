@@ -1,8 +1,8 @@
 from notation import coords, square
-from state import Status
+from state import Status, Draw
 from board import Board
 from pieces import Side
-from moves import legal_moves, make_move, unmake_move
+from moves import legal_moves, make_move, is_in_check
 
 class Game:
     
@@ -62,13 +62,23 @@ class Game:
     
     def next_turn(self):
         self.status.side = Side.BLACK if self.status.side == Side.WHITE else Side.WHITE
-        self.status.half_move = self.status.side == Side.BLACK
         if self.status.side == Side.WHITE:
             self.status.move = self.status.move + 1
         self.legal_moves = legal_moves(self.board, self.status)
         
+        if not any(self.legal_moves.values()):
+            self.status.finished = True
+            
+            if is_in_check(self.board, self.status.side):
+                self.status.check_mate = Side.WHITE if self.status.side is Side.BLACK else Side.BLACK
+            else:
+                self.status.draw = Draw.stalemate                                  
+        
         
     def play(self, orig: str, dest: str, promotion: str = 'q'):
+        if self.status.finished:
+            raise SystemError("Partida finalizada!")
+        
         c_orig = coords(orig)
         c_dest = coords(dest)
 
@@ -84,8 +94,12 @@ class Game:
         promoted = self._promoted_piece(piece, c_dest, promotion)
         c_target = self._en_passant_target(c_orig, c_dest, dest, is_pawn)
 
-        make_move(self.board, c_orig, c_dest, c_target)
-        self._after_move(piece, c_orig, c_dest, is_pawn, promoted)
+        _, captured = make_move(self.board, c_orig, c_dest, c_target)
+        
+        self.status.half_moves = 0 if is_pawn or captured is not None else self.status.half_moves+1
+        
+        self._after_move(piece, c_orig, c_dest, is_pawn, promoted)              
+
 
     def _after_move(self, piece: str, c_orig: tuple[int, int], c_dest: tuple[int, int], is_pawn: bool, promoted: str | None):
         self.status.en_passant = None
@@ -148,4 +162,24 @@ class Game:
             case _:
                 raise ValueError("Torre não encontrada")
 
-        make_move(self.board, rook_orig, rook_dest)
+        make_move(self.board, rook_orig, rook_dest)      
+                    
+        
+    def will_promote(self, orig: str, dest: str):
+        c_orig = coords(orig)
+        c_dest = coords(dest)
+
+        destinations = self.legal_moves.get(c_orig)
+        if destinations is None or c_dest not in destinations:
+            return False
+        
+        piece = self.board.get(*c_orig)
+        if piece not in ('P', 'p'):
+            return False
+        
+        final_row = 7 if piece == 'P' else 0        
+        row, _ = c_dest
+        
+        return row == final_row
+        
+
