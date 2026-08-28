@@ -61,6 +61,44 @@ def generate_fen(grid, status: Status):
     return f"{fen} {side} {castle} {ep_target} {half_moves} {status.move}"
 
 
+def _parse_fen_rank(grid, row, rank):
+    col = 0
+    for char in rank:
+        if char.isdigit():
+            col += int(char)
+            continue
+        if col >= 8:
+            col += 1
+            continue
+        grid[row][col] = char
+        col += 1
+
+    if col != 8:
+        raise ValueError(f"Fileira inválida no FEN: {rank!r}")
+
+
+def _build_fen_status(parts, side_char, castle, ep):
+    move = int(parts[5]) if len(parts) > 5 else 1
+    half_moves = int(parts[4]) if len(parts) > 4 else 0
+    status = Status(
+        side=Side.WHITE if side_char == "w" else Side.BLACK,
+        move=move,
+        half_moves=half_moves,
+        castle="" if castle == "-" else castle,
+    )
+
+    if ep == "-":
+        return status
+
+    # O FEN guarda a casa-alvo; o peão capturável fica na casa seguinte,
+    # do ponto de vista de quem está a jogar.
+    ep_row, ep_col = coords(ep)
+    status.ep_target = ep
+    pawn_row = ep_row - 1 if status.side == Side.WHITE else ep_row + 1
+    status.ep_pawn = square(pawn_row, ep_col)
+    return status
+
+
 def parse_fen(fen: str):
     """Converte um FEN em (grid 8x8, Status). Inverso de generate_fen()."""
     parts = fen.split()
@@ -77,35 +115,8 @@ def parse_fen(fen: str):
 
     grid = [[None] * 8 for _ in range(8)]
     for index, rank in enumerate(ranks):
-        row = 7 - index
-        col = 0
-        for char in rank:
-            if char.isdigit():
-                col += int(char)
-            elif col < 8:
-                grid[row][col] = char
-                col += 1
-            else:
-                col += 1
-        if col != 8:
-            raise ValueError(f"Fileira inválida no FEN: {rank!r}")
+        _parse_fen_rank(grid, 7 - index, rank)
 
-    status = Status(
-        side=Side.WHITE if side_char == "w" else Side.BLACK,
-        move=int(parts[5]) if len(parts) > 5 else 1,
-        half_moves=int(parts[4]) if len(parts) > 4 else 0,
-        castle="" if castle == "-" else castle,
-    )
-
-    if ep != "-":
-        # O FEN guarda a casa-alvo; o peão capturável fica na casa seguinte,
-        # do ponto de vista de quem está a jogar.
-        ep_row, ep_col = coords(ep)
-        status.ep_target = ep
-        status.ep_pawn = square(ep_row - 1 if status.side == Side.WHITE else ep_row + 1, ep_col)
-
+    status = _build_fen_status(parts, side_char, castle, ep)
     return grid, status
-
-
-# def get_notation(piece, orig, dest):
            
