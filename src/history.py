@@ -1,4 +1,6 @@
 from dataclasses import dataclass, replace
+from notation import generate_fen
+from board import Board
 from state import Status
 
 
@@ -7,6 +9,7 @@ class Record:
     position: str
     status: Status
     move: tuple[str | None, str | None]
+    fen: str
 
 
 class History:
@@ -14,9 +17,12 @@ class History:
     def __init__(self):
         self.registry: dict[str, Record] = {}
 
-    def update(self, position, status: Status, orig = None, dest = None):
+    def update(self, board: Board, status: Status, orig = None, dest = None):
+
+        fen = generate_fen(board.grid, status)
+        
         # Cópia do status: Game altera o original no lugar a cada lance.
-        record = Record(position, replace(status), (orig, dest))
+        record = Record(repr(board), replace(status), (orig, dest), fen)
 
         record_id = str(status.move)+'.'+status.side.value
         self.registry[record_id] = record

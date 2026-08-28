@@ -101,7 +101,7 @@ class Game:
         if c_dest not in destinations:
             raise ValueError("Posição de destino inválida")
         
-        self.history.update(self.board.__repr__(), self.status, orig, dest)
+        self.history.update(self.board, self.status, orig, dest)
 
         piece = self.board.get(*c_orig)
         is_pawn = piece in ('P', 'p')
@@ -220,7 +220,7 @@ class Game:
             self.status.finished = True
 
         if self.status.finished:
-            self.history.update(repr(self.board), self.status)
+            self.history.update(self.board, self.status)
         
         
         

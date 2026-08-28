@@ -1,10 +1,12 @@
 from game import Game
+from replay import Replay
 from notation import generate_fen
 from pieces import Side
 from config import AUTO_PROMO
 
 def main():    
     game = Game()
+    replay = None
     
     while True:
         print(game.board)
@@ -14,10 +16,10 @@ def main():
         print(f"\nJogam as {lado}")
                 
         while True:
-            entrada = input("lance (ou 'sair'): ").strip()   
-            if entrada == 'sair':
-                break   
-              
+            entrada = input("lance (ou 'fen', 'replay', 'sair'): ").strip()
+            if entrada in ('sair', 'replay'):
+                break
+
             if entrada == 'fen':
                 print(generate_fen(game.board.grid, game.status)+"\n")
                 continue
@@ -50,13 +52,40 @@ def main():
             
             elif game.status.draw is not None:
                 print(f"\nEmpate! {game.status.draw.value}")
+               
+            entrada = input("\nDigite 'replay' ou 'sair': ").strip()
+
+        elif entrada not in ('sair', 'replay'):
+            continue
+
+        if entrada == 'replay':
+            replay = Replay(game)
+
+        break
+
+    if replay is not None:
+        print(replay)
+        while True:
+            entrada = input("\nDigite '<', '>', '<<' '>>' ou 'sair': ").strip()
             
-            break
-                
-                                                             
-        if entrada == 'sair':
-            break
-    
-    
+            if entrada == 'sair':
+                break
+            
+            match(entrada):
+                case '<':
+                    replay.back()
+                case '>':
+                    replay.next()
+                case '<<':
+                    replay.first()
+                case '>>':
+                    replay.last()
+                case _:
+                    print("Entrada inválida!")
+                    continue
+
+            print(replay)
+
+
 if __name__ == "__main__":
     main()
