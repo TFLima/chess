@@ -1,7 +1,8 @@
-from notation import coords, square
+from notation import coords, square, parse_fen
 from state import Status, Draw
 from board import Board
 from pieces import Side
+from history import History
 from moves import legal_moves, make_move, is_in_check
 
 class Game:
@@ -9,14 +10,31 @@ class Game:
     board: Board
     status: Status
     legal_moves: dict
+    history: History
 
     # Casas iniciais das torres e o direito de roque que cada uma sustenta.
     CASTLE_BY_SQUARE = {(0, 0): 'Q', (0, 7): 'K', (7, 0): 'q', (7, 7): 'k'}
     
-    def __init__(self):
-        self.status = Status()
-        self.board = self._initialize_board()                
+    def __init__(self, fen: str | None = None):
+        self.history = History()
+        self.status, self.board = self._setup(fen)
         self.legal_moves = legal_moves(self.board, self.status)
+        self._can_continue()
+
+
+    def _setup(self, fen: str | None):
+        """Posição inicial padrão, ou a posição descrita pelo FEN."""
+        if fen is None:
+            return Status(), self._initialize_board()
+
+        grid, status = parse_fen(fen)
+        board = Board()
+        for row in range(Board.SIZE):
+            for col in range(Board.SIZE):
+                if grid[row][col] is not None:
+                    board.place(grid[row][col], row, col)
+
+        return status, board
         
         
     def _initialize_board(self):
@@ -64,18 +82,12 @@ class Game:
         self.status.side = Side.BLACK if self.status.side == Side.WHITE else Side.WHITE
         if self.status.side == Side.WHITE:
             self.status.move = self.status.move + 1
-        self.legal_moves = legal_moves(self.board, self.status)
-        
-        if not any(self.legal_moves.values()):
-            self.status.finished = True
-            
-            if is_in_check(self.board, self.status.side):
-                self.status.check_mate = Side.WHITE if self.status.side is Side.BLACK else Side.BLACK
-            else:
-                self.status.draw = Draw.stalemate                                  
+        self.legal_moves = legal_moves(self.board, self.status)        
+        self._can_continue()
         
         
     def play(self, orig: str, dest: str, promotion: str = 'q'):
+        
         if self.status.finished:
             raise SystemError("Partida finalizada!")
         
@@ -88,13 +100,15 @@ class Game:
 
         if c_dest not in destinations:
             raise ValueError("Posição de destino inválida")
+        
+        self.history.update(self.board.__repr__(), self.status, orig, dest)
 
         piece = self.board.get(*c_orig)
         is_pawn = piece in ('P', 'p')
         promoted = self._promoted_piece(piece, c_dest, promotion)
-        c_target = self._en_passant_target(c_orig, c_dest, dest, is_pawn)
+        c_captured = self._ep_captured_square(c_orig, c_dest, dest, is_pawn)
 
-        _, captured = make_move(self.board, c_orig, c_dest, c_target)
+        _, captured = make_move(self.board, c_orig, c_dest, c_captured)
         
         self.status.half_moves = 0 if is_pawn or captured is not None else self.status.half_moves+1
         
@@ -102,14 +116,14 @@ class Game:
 
 
     def _after_move(self, piece: str, c_orig: tuple[int, int], c_dest: tuple[int, int], is_pawn: bool, promoted: str | None):
-        self.status.en_passant = None
-        self.status.ep_holder = None
+        self.status.ep_pawn = None
+        self.status.ep_target = None
 
         if is_pawn:
             if abs(c_dest[0] - c_orig[0]) == 2:
-                self.status.en_passant = square(*c_dest)
+                self.status.ep_pawn = square(*c_dest)
                 step = -1 if piece == 'P' else 1
-                self.status.ep_holder = square(c_dest[0] + step, c_dest[1])
+                self.status.ep_target = square(c_dest[0] + step, c_dest[1])
             elif promoted is not None:
                 self.board.place(promoted, *c_dest)
 
@@ -127,22 +141,14 @@ class Game:
             return None
         return self._promoted(piece, promotion)
 
-    def _en_passant_target(self, c_orig: tuple[int, int], c_dest: tuple[int, int], dest: str, is_pawn: bool):
+    def _ep_captured_square(self, c_orig: tuple[int, int], c_dest: tuple[int, int], dest: str, is_pawn: bool):
         if not is_pawn:
             return None
 
-        if dest != self.status.ep_holder or c_dest[1] == c_orig[1]:
+        if dest != self.status.ep_target or c_dest[1] == c_orig[1]:
             return None
 
-        return coords(self.status.en_passant)
-
-
-    def _promoted(self, pawn: str, promotion: str):
-        """Peça escolhida na promoção, no caso (maiúscula/minúscula) do peão."""
-        if promotion.lower() not in ('q', 'r', 'b', 'n'):
-            raise ValueError(f"Peça de promoção inválida: {promotion!r}")
-
-        return promotion.upper() if pawn == 'P' else promotion.lower()
+        return coords(self.status.ep_pawn)
 
 
     def _revoke_castle(self, rights: str):
@@ -162,9 +168,17 @@ class Game:
             case _:
                 raise ValueError("Torre não encontrada")
 
-        make_move(self.board, rook_orig, rook_dest)      
-                    
-        
+        make_move(self.board, rook_orig, rook_dest)     
+
+
+    def _promoted(self, pawn: str, promotion: str):
+        """Peça escolhida na promoção, no caso (maiúscula/minúscula) do peão."""
+        if promotion.lower() not in ('q', 'r', 'b', 'n'):
+            raise ValueError(f"Peça de promoção inválida: {promotion!r}")
+
+        return promotion.upper() if pawn == 'P' else promotion.lower()
+
+
     def will_promote(self, orig: str, dest: str):
         c_orig = coords(orig)
         c_dest = coords(dest)
@@ -181,5 +195,61 @@ class Game:
         row, _ = c_dest
         
         return row == final_row
-        
+ 
+                    
+    def _can_continue(self):
+        # Encadeado: o mate tem precedência sobre qualquer critério de empate.
+        if not self.legal_moves:
+            if is_in_check(self.board, self.status.side):
+                self.status.check_mate = Side.WHITE if self.status.side is Side.BLACK else Side.BLACK
+            else:
+                self.status.draw = Draw.stalemate
+            self.status.finished = True
 
+        elif self.status.half_moves >= 100:
+            self.status.draw = Draw.fiftymoves
+            self.status.finished = True
+
+        elif self._insufficient_material():
+            self.status.draw = Draw.material
+            self.status.finished = True
+
+        # A posição atual ainda não está no histórico: 2 registros + a atual = tripla repetição.
+        elif self.history.find_position(repr(self.board), self.status) >= 2:
+            self.status.draw = Draw.repeated
+            self.status.finished = True
+
+        if self.status.finished:
+            self.history.update(repr(self.board), self.status)
+        
+        
+        
+    def _insufficient_material(self):
+        pieces = self._material_pieces()
+        if pieces is None:
+            return False
+
+        if len(pieces) <= 3:
+            return True
+
+        bishops = [sq_color for piece, sq_color in pieces if piece in ('B', 'b')]
+        return len(bishops) == 2 and bishops[0] == bishops[1]
+
+    def _material_pieces(self):
+        """Retorna peças e cores das casas dos bispos, ou None se o material não for insuficiente."""
+        pieces = []
+        for row in range(self.board.SIZE):
+            for col in range(self.board.SIZE):
+                piece = self.board.get(row, col)
+                if piece is None:
+                    continue
+                if len(pieces) == 4 or piece.lower() in ('q', 'r', 'p'):
+                    return None
+
+                bishop_square = (row + col) % 2 if piece.lower() == 'b' else None
+                pieces.append((piece, bishop_square))
+
+        return pieces
+                
+        
+                

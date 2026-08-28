@@ -208,11 +208,11 @@ def castle_moves(board: Board, status: Status):
     return result
         
 
-def _get_en_passant_target(board: Board, status: Status):
-    if status.en_passant is None:
+def _ep_capturable_pawn(board: Board, status: Status):
+    if status.ep_pawn is None:
         return None
 
-    current_row, current_col = coords(status.en_passant)
+    current_row, current_col = coords(status.ep_pawn)
     if not (0 <= current_row < 8 and 0 <= current_col < 8):
         return None
 
@@ -247,7 +247,7 @@ def _can_en_passant_capture(board: Board, current_row, current_col, next_col, ta
 
 
 def get_en_passant(board: Board, status: Status):
-    target = _get_en_passant_target(board, status)
+    target = _ep_capturable_pawn(board, status)
     if target is None:
         return []
 

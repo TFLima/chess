@@ -1,14 +1,16 @@
 from state import Status
+from pieces import Side
 
-def coords(square):
+def coords(algebraic):
     """Converte notação algébrica (ex: 'e2') para (row, col) 0-indexado."""
-    col = ord(square[0]) - ord("a")
-    row = int(square[1]) - 1
+    if not isinstance(algebraic, str) or len(algebraic) != 2:
+        raise ValueError(f"Posição inválida: {algebraic!r}")
 
-    if not (0 <= col < 8 and 0 <= row < 8):
-        raise ValueError("Posição inválida")
+    file, rank = algebraic[0].lower(), algebraic[1]
+    if not ("a" <= file <= "h" and "1" <= rank <= "8"):
+        raise ValueError(f"Posição inválida: {algebraic!r}")
 
-    return row, col
+    return int(rank) - 1, ord(file) - ord("a")
 
 def square(row, col):
     """Converte coordenadas para notação algébrica das casas"""
@@ -28,8 +30,6 @@ def square(row, col):
             raise ValueError('Posição inválida')
         
 def generate_fen(grid, status: Status):
-    from pieces import Side
-
     def serialize_rank(rank):
         empty = 0
         rank_fen = []
@@ -53,10 +53,56 @@ def generate_fen(grid, status: Status):
     fen = "/".join(rows)
     side = "w" if status.side == Side.WHITE else "b"
     castle = status.castle if status.castle else "-"
-    en_passant = status.en_passant if status.en_passant is not None else "-"
+    ep_target = status.ep_target if status.ep_target is not None else "-"
     half_moves = str(status.half_moves)
 
-    return f"{fen} {side} {castle} {en_passant} {half_moves} {status.move}"
+    return f"{fen} {side} {castle} {ep_target} {half_moves} {status.move}"
+
+
+def parse_fen(fen: str):
+    """Converte um FEN em (grid 8x8, Status). Inverso de generate_fen()."""
+    parts = fen.split()
+    if len(parts) < 4:
+        raise ValueError(f"FEN incompleto: {fen!r}")
+
+    placement, side_char, castle, ep = parts[:4]
+    if side_char not in ("w", "b"):
+        raise ValueError(f"Lado a jogar inválido no FEN: {side_char!r}")
+
+    ranks = placement.split("/")
+    if len(ranks) != 8:
+        raise ValueError(f"FEN precisa de 8 fileiras: {placement!r}")
+
+    grid = [[None] * 8 for _ in range(8)]
+    for index, rank in enumerate(ranks):
+        row = 7 - index
+        col = 0
+        for char in rank:
+            if char.isdigit():
+                col += int(char)
+            elif col < 8:
+                grid[row][col] = char
+                col += 1
+            else:
+                col += 1
+        if col != 8:
+            raise ValueError(f"Fileira inválida no FEN: {rank!r}")
+
+    status = Status(
+        side=Side.WHITE if side_char == "w" else Side.BLACK,
+        move=int(parts[5]) if len(parts) > 5 else 1,
+        half_moves=int(parts[4]) if len(parts) > 4 else 0,
+        castle="" if castle == "-" else castle,
+    )
+
+    if ep != "-":
+        # O FEN guarda a casa-alvo; o peão capturável fica na casa seguinte,
+        # do ponto de vista de quem está a jogar.
+        ep_row, ep_col = coords(ep)
+        status.ep_target = ep
+        status.ep_pawn = square(ep_row - 1 if status.side == Side.WHITE else ep_row + 1, ep_col)
+
+    return grid, status
 
 
 # def get_notation(piece, orig, dest):

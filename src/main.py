@@ -39,7 +39,20 @@ def main():
                     print()
                     break
                 except ValueError as erro:
-                    print(f"Erro: {erro}\n")  
+                    print(f"Erro: {erro}\n") 
+                    
+        if game.status.finished:
+            print(game.board)
+            
+            if game.status.check_mate is not None:
+                vencedor = 'brancas' if game.status.check_mate == Side.WHITE else 'pretas'
+                print(f"\nXeque-Mate! Vitória das {vencedor}")
+            
+            elif game.status.draw is not None:
+                print(f"\nEmpate! {game.status.draw.value}")
+            
+            break
+                
                                                              
         if entrada == 'sair':
             break

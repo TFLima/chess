@@ -16,8 +16,8 @@ class Status:
     move: int = 1
     half_moves: int = 0
     castle: str = 'KQkq'    
-    en_passant: str | None = None
-    ep_holder: str | None = None
+    ep_target: str | None = None   # casa-alvo do en passant (convenção FEN: atrás do peão)
+    ep_pawn: str | None = None     # casa do peão que acabou de avançar duas e pode ser capturado
     check_mate: Side | None = None
     draw: Draw | None = None
     finished: bool = False
