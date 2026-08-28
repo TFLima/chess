@@ -10,7 +10,9 @@ def coords(algebraic):
     if not ("a" <= file <= "h" and "1" <= rank <= "8"):
         raise ValueError(f"Posição inválida: {algebraic!r}")
 
-    return int(rank) - 1, ord(file) - ord("a")
+    row = int(rank) - 1
+    col = ord(file) - ord("a")
+    return row, col
 
 def square(row, col):
     """Converte coordenadas para notação algébrica das casas"""
