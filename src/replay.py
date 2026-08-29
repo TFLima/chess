@@ -53,7 +53,11 @@ class Replay:
     def _load(self):
         self.board.grid, self.status = parse_fen(self.records[self.cursor].fen)
 
-    def __repr__(self):
+    def is_end(self):
+        return self.cursor >= len(self.records) - 1
+
+    def header(self):
+        """Uma linha: onde estamos no histórico, o lance e o lado que o jogou."""
         record = self.records[self.cursor]
         lado = 'brancas' if self.status.side == Side.WHITE else 'pretas'
 
@@ -65,4 +69,8 @@ class Replay:
             lance = "fim de partida" if record.status.finished else "posição atual"
 
         return (f"[{self.cursor + 1}/{len(self.records)}] "
-                f"lance {self.status.move}, {lado} — {lance}\n{self.board}")
+                f"lance {self.status.move}, {lado} — {lance}")
+
+    def __repr__(self):
+        """Cabeçalho + tabuleiro em texto. Quem já desenha usa só header()."""
+        return f"{self.header()}\n{self.board}"
