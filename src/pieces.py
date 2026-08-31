@@ -9,7 +9,7 @@ class Side(Enum):
 class Piece(ABC):
     side: Side
     notation: chr
-    value: int
+    value: int | None = None
     
     captures_as_it_moves = True
 
@@ -36,7 +36,6 @@ class King(Piece):
     def __init__(self, side: Side):
         super().__init__(side)
         self.notation = 'K' if side == Side.WHITE else 'k'
-        self.value = 100
 
     def moves(self, row, col):
         """Rei se move 1 casa em qualquer direção."""
@@ -50,7 +49,7 @@ class Queen(Piece):
     def __init__(self, side: Side):
         super().__init__(side)
         self.notation = 'Q' if side == Side.WHITE else 'q'
-        self.value = 9
+        self.value = 900
         
     def moves(self, row, col):
         """Rainha se move em linha reta ou diagonal, até 7 casas."""
@@ -64,7 +63,7 @@ class Rook(Piece):
     def __init__(self, side: Side):
         super().__init__(side)
         self.notation = 'R' if side == Side.WHITE else 'r'
-        self.value = 5
+        self.value = 500
         
     def moves(self, row, col):
         """Torre se move em linha reta, até 7 casas."""
@@ -78,7 +77,7 @@ class Bishop(Piece):
     def __init__(self, side: Side):
         super().__init__(side)
         self.notation = 'B' if side == Side.WHITE else 'b'
-        self.value = 3
+        self.value = 330
         
     def moves(self, row, col):
         """Bispo se move em diagonal, até 7 casas."""
@@ -92,7 +91,7 @@ class Knight(Piece):
     def __init__(self, side: Side):
         super().__init__(side)
         self.notation = 'N' if side == Side.WHITE else 'n'
-        self.value = 3
+        self.value = 320
         
     def moves(self, row, col):
         """Cavalo se move uma casa em linha reta + uma na diagonal."""
@@ -107,7 +106,7 @@ class Pawn(Piece):
     def __init__(self, side: Side):
         super().__init__(side)
         self.notation = 'P' if side == Side.WHITE else 'p'
-        self.value = 1
+        self.value = 100
         
     def moves(self, row, col):
         """Peão se move sempre em frente (de acordo com o lado), 1 casa, ou 2 no primeiro movimento"""

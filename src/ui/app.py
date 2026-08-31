@@ -84,7 +84,10 @@ class App:
     def _board_clicked(self, casa):
         """Primeiro clique escolhe a peça; o segundo, num destino válido, joga."""
         if casa in self.targets():
-            self.play(self.selected, casa)
+            if self.game.will_promote(square(*self.selected), square(*casa)):
+                self.choose_promotion(self.selected, casa)
+            else:
+                self.play(self.selected, casa)
         elif casa in self.game.legal_moves:
             self.selected = casa
         else:
@@ -117,15 +120,20 @@ class App:
             return []
         return self.game.legal_moves.get(self.selected, [])
 
-    def play(self, orig, dest):
-        # if self.game.will_promote(square(*orig), square(*dest)):
-        #     self.show_dialog('Promover peão', ['Dama', 'Torre', 'Bispo', 'Cavalo'], self.choose_promotion)            
+    def play(self, orig, dest):                   
         self.game.play(square(*orig), square(*dest))
         self.selected = None
-                
-    # def choose_promotion(app, index, orig, dest):
-    #     options = ['Q','R','B','N']
-    #     app.game.play(square(*orig), square(*dest))
+
+    def promote(self, orig, dest, promotion):
+        self.game.play(square(*orig), square(*dest), promotion)
+        self.promotion = None
+        self.selected = None
+
+    def choose_promotion(self, orig, dest):
+        options = ['Q','R','B','N']
+        self.promotion = (orig, dest)
+        self.show_dialog("Promover peão:", options, lambda index: self.promote(orig, dest, options[index]))
+    
 
     def caption(self):
         if self.replay is not None:
@@ -179,5 +187,7 @@ class App:
             self.dialog = None
             self.dialog_rects = []
             self.dialog_hover = None
+            if self.promotion is not None:
+                self.promote(self.promotion[0], self.promotion[1], 'Q')  # default promotion
         else:
             self.replay = None
