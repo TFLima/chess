@@ -10,6 +10,9 @@ class Piece(ABC):
     side: Side
     notation: chr
     value: int | None = None
+    phase: int | None = None
+    mobility: int = 0
+    square_table: list[list[int]] | None = None
         
     captures_as_it_moves = True
 
@@ -86,6 +89,8 @@ class Queen(Piece):
         super().__init__(side)
         self.notation = 'Q' if side == Side.WHITE else 'q'
         self.value = 900
+        self.phase = 4
+        self.mobility = 1
         self.square_table = [
                                 [-20,-10,-10, -5, -5,-10,-10,-20],
                                 [-10,  0,  0,  0,  0,  0,  0,-10],
@@ -111,6 +116,8 @@ class Rook(Piece):
         super().__init__(side)
         self.notation = 'R' if side == Side.WHITE else 'r'
         self.value = 500
+        self.phase = 2
+        self.mobility = 2
         self.square_table = [
                                 [ 0,  0,  0,  5,  5,  0,  0,  0],
                                 [ 5, 10, 10, 10, 10, 10, 10,  5],  # Linha 7 (Excelente para Torres)
@@ -136,6 +143,8 @@ class Bishop(Piece):
         super().__init__(side)
         self.notation = 'B' if side == Side.WHITE else 'b'
         self.value = 330
+        self.phase = 1
+        self.mobility = 5
         self.square_table = [
                                 [-20,-10,-10,-10,-10,-10,-10,-20],
                                 [-10,  0,  0,  0,  0,  0,  0,-10],
@@ -161,6 +170,8 @@ class Knight(Piece):
         super().__init__(side)
         self.notation = 'N' if side == Side.WHITE else 'n'
         self.value = 320
+        self.phase = 1
+        self.mobility = 4
         self.square_table = [
                                 [-50,-40,-30,-30,-30,-30,-40,-50],
                                 [-40,-20,  0,  0,  0,  0,-20,-40],
