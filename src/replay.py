@@ -3,10 +3,10 @@ from dataclasses import replace
 from board import Board
 from game import Game
 from history import Record
-from notation import generate_fen, parse_fen
 from pieces import Side
 from state import Status
-
+from notation import generate_fen, parse_fen
+from moves import find_king, is_in_check
 
 class Replay:
     """Percorre as posições guardadas no histórico, sem tocar na partida."""
@@ -14,6 +14,7 @@ class Replay:
     board: Board
     status: Status
     cursor: int
+    checked: tuple | None = None
 
     def __init__(self, game: Game):
         self.records = list(game.history.registry.values())
@@ -52,6 +53,12 @@ class Replay:
 
     def _load(self):
         self.board.grid, self.status = parse_fen(self.records[self.cursor].fen)
+        self.checked = self._checked_king()
+
+    def _checked_king(self):
+        side = self.status.side
+        return find_king(self.board, side) if is_in_check(self.board, side) else None
+        
 
     def is_end(self):
         return self.cursor >= len(self.records) - 1

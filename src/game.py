@@ -3,7 +3,7 @@ from state import Status, Draw
 from board import Board
 from pieces import Side
 from history import History
-from moves import legal_moves, make_move, is_in_check
+from moves import legal_moves, make_move, is_in_check, find_king
 
 class Game:
     
@@ -11,6 +11,7 @@ class Game:
     status: Status
     legal_moves: dict
     history: History
+    checked: tuple | None
 
     # Casas iniciais das torres e o direito de roque que cada uma sustenta.
     CASTLE_BY_SQUARE = {(0, 0): 'Q', (0, 7): 'K', (7, 0): 'q', (7, 7): 'k'}
@@ -20,6 +21,7 @@ class Game:
         self.status, self.board = self._setup(fen)
         self.legal_moves = legal_moves(self.board, self.status)
         self._can_continue()
+        self.checked = None
 
 
     def _setup(self, fen: str | None):
@@ -80,6 +82,7 @@ class Game:
     
     def next_turn(self):
         self.status.side = Side.BLACK if self.status.side == Side.WHITE else Side.WHITE
+        self.checked = self._checked_king()
         if self.status.side == Side.WHITE:
             self.status.move = self.status.move + 1
         self.legal_moves = legal_moves(self.board, self.status)        
@@ -223,7 +226,6 @@ class Game:
             self.history.update(self.board, self.status)
         
         
-        
     def _insufficient_material(self):
         pieces = self._material_pieces()
         if pieces is None:
@@ -234,6 +236,7 @@ class Game:
 
         bishops = [sq_color for piece, sq_color in pieces if piece in ('B', 'b')]
         return len(bishops) == 2 and bishops[0] == bishops[1]
+
 
     def _material_pieces(self):
         """Retorna peças e cores das casas dos bispos, ou None se o material não for insuficiente."""
@@ -251,5 +254,8 @@ class Game:
 
         return pieces
                 
-        
                 
+    def _checked_king(self):        
+        if is_in_check(self.board, self.status.side):
+            return find_king(self.board, self.status.side)   
+        return None             
