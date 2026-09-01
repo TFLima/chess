@@ -8,6 +8,7 @@ from notation import square
 from pieces import Side
 from ui import theme
 from ui.render import Renderer, square_at, control_at
+from bot.evaluation import evaluation
 
 FPS = 60
 
@@ -42,7 +43,7 @@ class App:
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     self._dismiss()
             
-            pygame.display.set_caption(f"Xadrez — {self.caption()}")
+            pygame.display.set_caption(f"Xadrez — {self.caption()}          ev = {evaluation(self.game.board)}")
             self.draw(surface, renderer)
             pygame.display.flip()
             clock.tick(FPS)
@@ -54,14 +55,13 @@ class App:
         if self.replay is None:
             renderer.draw(surface, self.game.board.grid, self.game.checked, self.selected, self.targets())
         else:
-            renderer.draw(surface, self.replay.board.grid, self.replay.checked)
-
+            renderer.draw(surface, self.replay.board.grid, self.replay.checked)                
         if self.message:
             renderer.draw_message(surface, self.message)
         elif self.dialog:
             self.dialog_rects = renderer.draw_dialog(
-                surface, self.dialog['title'], self.dialog['options'], self.dialog_hover)
-
+                surface, self.dialog['title'], self.dialog['options'], self.dialog_hover)               
+    
 
     def click(self, pos):
         if self.message:
@@ -122,7 +122,7 @@ class App:
 
     def play(self, orig, dest):                   
         self.game.play(square(*orig), square(*dest))
-        self.selected = None
+        self.selected = None   
 
     def promote(self, orig, dest, promotion):
         self.game.play(square(*orig), square(*dest), promotion)
@@ -131,8 +131,9 @@ class App:
 
     def choose_promotion(self, orig, dest):
         options = ['Q','R','B','N']
+        labels = ['Dama','Torre','Bispo','Cavalo']
         self.promotion = (orig, dest)
-        self.show_dialog("Promover peão:", options, lambda index: self.promote(orig, dest, options[index]))
+        self.show_dialog("Promover peão:", labels, lambda index: self.promote(orig, dest, options[index]))
     
 
     def caption(self):
@@ -141,15 +142,25 @@ class App:
 
         status = self.game.status
 
-        if status.check_mate is not None:
-            vencedor = 'brancas' if status.check_mate == Side.WHITE else 'pretas'
-            return f"xeque-mate, vitória das {vencedor}"
-
-        if status.draw is not None:
-            return f"empate: {status.draw.value}"
+        self.message = self.final_message()
+        if self.message is not None:
+            return self.message
 
         lado = 'brancas' if status.side == Side.WHITE else 'pretas'
         return f"lance {status.move}, jogam as {lado}"
+    
+    def final_message(self):
+        status = self.game.status
+        
+        if status.check_mate is not None:
+            vencedor = 'brancas' if status.check_mate == Side.WHITE else 'pretas'
+            return f"Xeque-mate, vitória das {vencedor}"
+
+        if status.draw is not None:
+            return f"Empate: {status.draw.value}" 
+        
+        return None
+               
 
     def show_message(self, text: str):
         """Exibe uma mensagem fixa na tela. Clique para fechar."""

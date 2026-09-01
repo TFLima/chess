@@ -12,6 +12,7 @@ class Piece(ABC):
     value: int | None = None
     phase: int | None = None
     mobility: int = 0
+    weight: int = 0
     square_table: list[list[int]] | None = None
         
     captures_as_it_moves = True
@@ -39,7 +40,7 @@ class Piece(ABC):
         if not self.square_table:
             return 0
         # Se for peça preta, inverte o row
-        row = 7 - row if self.side == Side.BLACK else row        
+        row = 7 - row if self.side == Side.WHITE else row        
         return self.square_table[row][col]
 
 class King(Piece):
@@ -78,7 +79,7 @@ class King(Piece):
     def pst_value(self, row, col, phase=None):
         """Retorna o valor da peça na posição (row, col) de acordo com a tabela de valores."""        
         phase = 1 if phase is None else phase
-        row = 7 - row if self.side == Side.BLACK else row
+        row = 7 - row if self.side == Side.WHITE else row
         mg_score = self.midgame_square_table[row][col]
         eg_score = self.endgame_square_table[row][col]
         return mg_score * phase + eg_score * (1 - phase)
@@ -91,6 +92,7 @@ class Queen(Piece):
         self.value = 900
         self.phase = 4
         self.mobility = 1
+        self.weight = 80
         self.square_table = [
                                 [-20,-10,-10, -5, -5,-10,-10,-20],
                                 [-10,  0,  0,  0,  0,  0,  0,-10],
@@ -118,6 +120,7 @@ class Rook(Piece):
         self.value = 500
         self.phase = 2
         self.mobility = 2
+        self.weight = 40
         self.square_table = [
                                 [ 0,  0,  0,  5,  5,  0,  0,  0],
                                 [ 5, 10, 10, 10, 10, 10, 10,  5],  # Linha 7 (Excelente para Torres)
@@ -145,6 +148,7 @@ class Bishop(Piece):
         self.value = 330
         self.phase = 1
         self.mobility = 5
+        self.weight = 20
         self.square_table = [
                                 [-20,-10,-10,-10,-10,-10,-10,-20],
                                 [-10,  0,  0,  0,  0,  0,  0,-10],
@@ -172,6 +176,7 @@ class Knight(Piece):
         self.value = 320
         self.phase = 1
         self.mobility = 4
+        self.weight = 20
         self.square_table = [
                                 [-50,-40,-30,-30,-30,-30,-40,-50],
                                 [-40,-20,  0,  0,  0,  0,-20,-40],
@@ -198,6 +203,7 @@ class Pawn(Piece):
         super().__init__(side)
         self.notation = 'P' if side == Side.WHITE else 'p'
         self.value = 100
+        self.weight = 1
         self.square_table = [
                                 [  0,  0,  0,  0,  0,  0,  0,  0],  # Linha 8: Promoção (0, pois vira Dama/outra peça)
                                 [ 50, 50, 50, 50, 50, 50, 50, 50],  # Linha 7: A um passo da promoção (Bônus Máximo!)

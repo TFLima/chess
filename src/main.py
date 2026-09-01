@@ -3,6 +3,7 @@ from replay import Replay
 from notation import generate_fen
 from pieces import Side
 from config import AUTO_PROMO
+from bot.evaluation import evaluation
 
 
 def print_turn(game: Game):
@@ -33,6 +34,10 @@ def read_command(game: Game):
 
         if entrada == 'fen':
             print(generate_fen(game.board.grid, game.status) + "\n")
+            continue
+        
+        if entrada == 'ev':
+            print(f"{evaluation(game.board)}\n")
             continue
 
         jogada = entrada.split()

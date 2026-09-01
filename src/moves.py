@@ -101,8 +101,15 @@ def validate_piece_moves(board: Board, piece: Piece, row, col):
     if piece.captures_as_it_moves:
         return valid_moves
 
+    valid_moves.extend(validate_piece_attacks(board, piece, row, col))
+    return valid_moves
+
+
+def validate_piece_attacks(board: Board, piece: Piece, row, col):
+    valid_attacks = []
+    
     for ray in piece.attacks(row, col):
-        valid_moves.extend(
+        valid_attacks.extend(
             _ray_moves(
                 board,
                 piece,
@@ -112,10 +119,10 @@ def validate_piece_moves(board: Board, piece: Piece, row, col):
             )
         )
 
-    return valid_moves
+    return valid_attacks
 
 
-def _piece_attacks_square(board: Board, piece: Piece, origin_row, origin_col, target_row, target_col):
+def piece_attacks_square(board: Board, piece: Piece, origin_row, origin_col, target_row, target_col):
     """Verifica se uma peça ataca a casa alvo, incluindo bloqueios de raio."""
     for ray in piece.attacks(origin_row, origin_col):
         for r, c in ray:
@@ -138,7 +145,7 @@ def is_square_attacked(board: Board, row, col, by_side: Side):
             piece = piece_from_str(item)
             if piece.side != by_side:
                 continue
-            if _piece_attacks_square(board, piece, r0, c0, row, col):
+            if piece_attacks_square(board, piece, r0, c0, row, col):
                 return True
     return False
 
@@ -243,7 +250,7 @@ def _can_en_passant_capture(board: Board, current_row, current_col, next_col, ta
         return False
 
     pawn = piece_from_str(ally_pawn)
-    return _piece_attacks_square(board, pawn, current_row, next_col, target_row, target_col)
+    return piece_attacks_square(board, pawn, current_row, next_col, target_row, target_col)
 
 
 def get_en_passant(board: Board, status: Status):
