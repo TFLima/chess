@@ -105,7 +105,7 @@ def validate_piece_moves(board: Board, piece: Piece, row, col):
     return valid_moves
 
 
-def validate_piece_attacks(board: Board, piece: Piece, row, col):
+def validate_piece_attacks(board: Board, piece: Piece, row, col, _include_empty=False):
     valid_attacks = []
     
     for ray in piece.attacks(row, col):
@@ -114,7 +114,7 @@ def validate_piece_attacks(board: Board, piece: Piece, row, col):
                 board,
                 piece,
                 ray,
-                include_empty=False,
+                include_empty=_include_empty,
                 capture_if_enemy=True,
             )
         )
