@@ -1,5 +1,9 @@
+"""
+Falta implementar: rook_activity, bishop_pair, outposts, early_queen, time_waste, late_development 
+(esses 3 últimos precisam de histórico)
+"""
 from board import Board
-from pieces import Piece, Side, piece_from_str
+from pieces import Side, piece_from_str
 from moves import validate_piece_moves, validate_piece_attacks, find_king
 
 # Colunas d/e: rei que não rocou não recebe bônus de escudo.
@@ -8,18 +12,33 @@ CENTER_COLUMNS = (3, 4)
 SHIELD_MAX_DISTANCE = 3
 SHIELD_SCORE = {1: 12, 2: 6, 3: 4}
 STORM_PENALTY = {1: 10, 2: 6, 3: 3}
+PASSED_BONUS = {1: 0, 2: 10, 3: 15, 4: 25, 5: 40, 6: 70}
+ISLAND_PENALTY = {1: 0, 2: 3, 3: 6, 4: 9}
+ISLAND_WEIGHT = (1.0, 2.0)    # fragmentar a estrutura dói mais no final
+DOUBLED_PENALTY = (10, 22)    # (meio-jogo, final)
+ISOLATED_PENALTY = (5, 14)
+BACKWARD_PENALTY = (8, 14)
+PASSED_WEIGHT = (0.4, 1.0)    # o passado nunca zera no meio-jogo
+# Bônus de peões conectados, por fileira do peão (base 0).
+CONNECTED_BONUS = {1: 3, 2: 4, 3: 6, 4: 11, 5: 20, 6: 35}
+CONNECTED_WEIGHT = (0.5, 1.0) # peões conectados decidem finais
+DEFENDED_EXTRA = (4, 6)       # somado ao bônus de falange, não substituto
+
 
 
 def evaluation(board: Board):
     score = 0
-    phase, attackers, pawn_attacks = _precompute(board)
+    phase, attackers, pawn_attacks, pawn_columns = _precompute(board)
 
     score += evaluate_material(board)
     score += evaluate_position(board, phase)
     score += evaluate_mobility(board, pawn_attacks)
 
-    score += (king_safety(board, Side.WHITE, phase, attackers) 
-            - king_safety(board, Side.BLACK, phase, attackers))
+    score += (king_safety(board, Side.WHITE, attackers, phase) 
+            - king_safety(board, Side.BLACK, attackers, phase))   
+    
+    score += (pawn_structure(Side.WHITE, pawn_columns, phase) 
+            - pawn_structure(Side.BLACK, pawn_columns, phase))   
 
     return score
 
@@ -28,16 +47,19 @@ def _precompute(board: Board):
     phase_value = 0
     attackers = {Side.WHITE: {}, Side.BLACK: {}}
     pawn_attacks = {Side.WHITE: set(), Side.BLACK: set()}
+    pawn_columns = {Side.WHITE: {}, Side.BLACK: {}}
     for row in range(8):
         for col in range(8):
             piece = _piece_at(board, row, col)
             if piece is None:
                 continue
             phase_value += piece.phase or 0
+            if piece.notation.lower() == 'p':
+                pawn_columns[piece.side].setdefault(col, []).append(row) # Agrupa os peões por coluna
             _record_attacks(board, piece, row, col, attackers, pawn_attacks)
     
     phase_value = min(1, phase_value / 24) # Normaliza o valor da fase do jogo para o intervalo [0, 1]            
-    return phase_value, attackers, pawn_attacks  
+    return phase_value, attackers, pawn_attacks, pawn_columns 
 
 
 def _piece_at(board: Board, row: int, col: int):
@@ -112,7 +134,7 @@ def _safe_moves(moves, side: Side, pawn_attacks):
     return [move for move in moves if move not in unsafe_moves]
     
     
-def king_safety(board: Board, side: Side, phase, attacks_map):
+def king_safety(board: Board, side: Side, attacks_map, phase):
     return (
         (_king_column_score(board, side) * phase)
       - (_king_zone_attackers(board, side, attacks_map) * phase)
@@ -227,3 +249,75 @@ def _zone_attack_weight(board: Board, side: Side, attackers_by_square, zone):
                                 
     return weight * (zone_weakness / len(zone)) * count_penalty.get(len(zone_attacks), 99) / 100            
                     
+def pawn_structure(side: Side, pawn_columns: dict[Side, dict[int, list[int]]], phase: float):
+    enemy_side = Side.BLACK if side == Side.WHITE else Side.WHITE
+    ally_pawns = pawn_columns[side]
+    enemy_pawns = pawn_columns[enemy_side]
+    direction = 1 if side == Side.WHITE else -1
+    
+    score = 0
+    for col, rows in ally_pawns.items():
+        score -= (len(rows) - 1) * _taper(*DOUBLED_PENALTY, phase) # Penaliza peões dobrados
+        if col-1 not in ally_pawns and col+1 not in ally_pawns:
+            score -= len(rows) * _taper(*ISOLATED_PENALTY, phase)  # Penaliza peões isolados
+        passed = _pawn_passed(col, rows, enemy_pawns, direction)
+        if passed is not None:            
+            score += _rank_bonus(PASSED_BONUS, passed, direction) * _taper(*PASSED_WEIGHT, phase) # Premia peões passados conforme avanço
+        for row in rows:
+            score += _connected_pawn(row, col, ally_pawns, direction, phase)
+            score -= _backward_pawn(row, col, ally_pawns, enemy_pawns, direction, phase)
+
+    islands = sum(1 for col in range(8) if col in ally_pawns and col - 1 not in ally_pawns) # Conta as ilhas de peões
+
+    return score - ISLAND_PENALTY.get(min(islands, 4), 0) * _taper(*ISLAND_WEIGHT, phase)
+
+def _taper(mg, eg, phase):
+    """Interpola entre o peso de meio-jogo e o de final (phase: 1 = meio-jogo, 0 = final)."""
+    return mg * phase + eg * (1-phase)
+
+def _rank_bonus(table, row, dir):
+    """Lê a tabela pela fileira do peão, espelhando as fileiras para as pretas."""
+    return table[row if dir == 1 else 7 - row]
+            
+def _pawn_passed(col, rows, enemy_pawns: dict[int, list[int]], dir: int):
+    leading_pawn = _leading_pawn(rows, dir)
+    if col not in enemy_pawns and col-1 not in enemy_pawns and col+1 not in enemy_pawns:
+        return leading_pawn
+    if col in enemy_pawns and _leading_pawn(enemy_pawns.get(col), dir) * dir > leading_pawn * dir:
+        return None
+    if col-1 in enemy_pawns and _leading_pawn(enemy_pawns.get(col-1), dir) * dir > leading_pawn * dir:
+        return None
+    if col+1 in enemy_pawns and _leading_pawn(enemy_pawns.get(col+1), dir) * dir > leading_pawn * dir:
+        return None    
+    return leading_pawn
+    
+def _leading_pawn(rows, direction):
+    return max(rows) if direction == 1 else min(rows)
+
+def _connected_pawn(row, col, ally_pawns, dir, phase):
+    """Falange e defesa são vantagens independentes e somam."""
+    neighbours = [ally_pawns[adjacent_col]
+                  for adjacent_col in (col-1, col+1) if adjacent_col in ally_pawns]
+
+    bonus = 0
+    if any(row in rows for rows in neighbours):
+        bonus += _rank_bonus(CONNECTED_BONUS, row, dir) * _taper(*CONNECTED_WEIGHT, phase) # Peão em falange
+    if any(row-dir in rows for rows in neighbours):
+        bonus += _taper(*DEFENDED_EXTRA, phase) # Peão defendido por outro aliado
+    return bonus
+
+def _backward_pawn(row, col, ally_pawns, enemy_pawns, dir, phase):
+    distance = 8
+    is_guarded = False
+    is_blocked = False if col not in enemy_pawns else row+dir in enemy_pawns.get(col)
+    
+    for adjacent_col in (col-1, col+1):
+        if adjacent_col in enemy_pawns and row+dir*2 in enemy_pawns.get(adjacent_col):
+            is_guarded = True            
+        if adjacent_col in ally_pawns:
+            nearest_pawn = _leading_pawn(ally_pawns.get(adjacent_col), -dir)
+            distance = min(distance, (nearest_pawn * dir) - (row * dir))
+       
+    if 1 <= distance < 8 and (is_blocked or is_guarded):
+        return _taper(*BACKWARD_PENALTY, phase) # Penalidade por atraso de peão
+    return 0

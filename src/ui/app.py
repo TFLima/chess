@@ -43,7 +43,7 @@ class App:
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     self._dismiss()
             
-            pygame.display.set_caption(f"Xadrez — {self.caption()}          ev = {evaluation(self.game.board)}")
+            pygame.display.set_caption(f"Xadrez — {self.caption()}              ev = {evaluation(self.game.board)}")
             self.draw(surface, renderer)
             pygame.display.flip()
             clock.tick(FPS)
