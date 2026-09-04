@@ -66,21 +66,52 @@ def pseudo_legal_moves(board: Board, side: Side):
     return valid_moves
             
                       
-def _ray_moves(board: Board, piece: Piece, ray, *, include_empty: bool, capture_if_enemy: bool):
+def _ray_moves(board: Board, piece: Piece, ray, *, include_empty: bool, capture_if_enemy: bool,
+               xray: bool = False):
     """Coleta destinos válidos ao percorrer um raio da peça."""
+    direction = _ray_direction(ray) if xray else None
+
     for r, c in ray:
         if not (0 <= r < board.SIZE and 0 <= c < board.SIZE):
             return
 
-        item = board.get(r, c)
-        if item is None:
-            if include_empty:
-                yield (r, c)
-            continue
+        continue_ray, destination = _ray_square_result(
+            board, piece, r, c, include_empty, capture_if_enemy, direction
+        )
+        if destination is not None:
+            yield destination
+        if not continue_ray:
+            return
 
-        if piece_from_str(item).side != piece.side and capture_if_enemy:
-            yield (r, c)
-        return
+
+def _ray_square_result(board: Board, piece: Piece, row, col, include_empty,
+                       capture_if_enemy, direction):
+    """Retorna se o raio continua e, opcionalmente, o destino encontrado."""
+    item = board.get(row, col)
+    if item is None:
+        return True, (row, col) if include_empty else None
+
+    blocker = piece_from_str(item)
+    if blocker.side != piece.side:
+        return False, (row, col) if capture_if_enemy else None
+
+    # Bateria: atravessa a peça amiga que desliza na mesma direção.
+    can_pass = direction is not None and _slides_along(blocker, row, col, direction)
+    return can_pass, None
+
+
+def _ray_direction(ray):
+    """Direção (dr, dc) de um raio. None se o raio tem uma casa só."""
+    if len(ray) < 2:
+        return None
+    (r0, c0), (r1, c1) = ray[0], ray[1]
+    return (r1 - r0, c1 - c0)
+
+
+def _slides_along(piece: Piece, row, col, direction):
+    """A peça em (row, col) ataca deslizando (mais de uma casa) nessa direção?"""
+    target = (row + direction[0], col + direction[1])
+    return any(len(ray) > 1 and ray[0] == target for ray in piece.attacks(row, col))
 
 
 def validate_piece_moves(board: Board, piece: Piece, row, col):
@@ -105,7 +136,13 @@ def validate_piece_moves(board: Board, piece: Piece, row, col):
     return valid_moves
 
 
-def validate_piece_attacks(board: Board, piece: Piece, row, col, _include_empty=False):
+def validate_piece_attacks(board: Board, piece: Piece, row, col, _include_empty=False, xray=False):
+    """Casas atacadas pela peça.
+
+    Com xray=True o raio atravessa peças amigas que deslizam na mesma direção,
+    de forma que numa bateria (dama atrás de torre) as duas contem as mesmas
+    casas. Só faz sentido na avaliação — não gera lance legal.
+    """
     valid_attacks = []
     
     for ray in piece.attacks(row, col):
@@ -116,6 +153,7 @@ def validate_piece_attacks(board: Board, piece: Piece, row, col, _include_empty=
                 ray,
                 include_empty=_include_empty,
                 capture_if_enemy=True,
+                xray=xray,
             )
         )
 
