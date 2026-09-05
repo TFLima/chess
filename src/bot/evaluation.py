@@ -321,3 +321,44 @@ def _backward_pawn(row, col, ally_pawns, enemy_pawns, dir, phase):
     if 1 <= distance < 8 and (is_blocked or is_guarded):
         return _taper(*BACKWARD_PENALTY, phase) # Penalidade por atraso de peão
     return 0
+
+def rook_activity(board: Board, piece_map: set):
+    score = 0
+    white_rooks = {rows: {}, cols: {}}
+    black_rooks = {rows: {}, cols: {}}
+    for square, piece in piece_map.items():
+        if piece not in ('R','r'):
+            continue
+        row, col = square
+        # restante do código aqui
+        if piece == 'R':
+           white_rooks[rows].setdefault(row, []).extend(col)
+           white_rooks[cols].setdefault(col, []).extend(row)
+        else:
+           # mesma coisa para as pretas
+
+    score += _connected_rooks(white_rooks, 'R')
+    score -= _connected_rooks(black_rooks, 'r')
+    return score
+
+
+def _connected_rooks(board, rooks, _not):
+    row_score = 0
+    col_score = 0
+    for row, cols in rooks[rows].items():
+        if len(cols) <= 1:
+            continue 
+        for col in range(min(cols)+1, max(cols)):
+            value = board.get(row, col)
+            if value is None:
+                continue
+            if value == _not:
+                row_score += 1
+            break
+
+    # mesma coisa para as colunas
+    return row_score + col_score
+
+
+
+    
